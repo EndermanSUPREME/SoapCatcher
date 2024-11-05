@@ -30,3 +30,6 @@ With students running the server and client side on two separate computers.
 
 Once the Server detects the player has connected, the Play button will appear on the tkinter gui and you can play at your own leisure.<br>
 Objective is to Not Drop the Soap! Catch as many falling bars of soap as you can! The game progressively gets more difficult.
+
+### Preview Image
+![Game_Preview_Image](https://github.com/user-attachments/assets/f86dc443-b307-40c5-99b0-90e99b3cb5bc)
