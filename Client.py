@@ -59,6 +59,7 @@ def StartClient():
         while True:
             global msgData
             if msgData == "exit":
+                clientsocket.send(b'\n')
                 print("[*] Killing Connection. . .")
                 break
             clientsocket.send(msgData.encode())
