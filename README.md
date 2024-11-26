@@ -1,6 +1,11 @@
 # Soap Catcher
+# Description
+This assignment is focused on getting involved with Socket Servers to understand how the Transport Layer sends over the data and forms a connection. Along with seeing how the Application Layer handles sending and recieving the data. The setup involves a game being hosted on a Server where the player(s) are controlled through the connection of a Client.
 
-## Instructions
+## Project Assignment
+<details>
+<summary><strong>Instructions</strong></summary>
+
 1. Using the code provided with the homework, and the pygame python library, continue
 working on the client-server application of the “bucket catch” game.
 2. The objective of the game is to collect as many falling objects as possible, similar to the
@@ -24,12 +29,24 @@ the 2 people’s project made specifically for 2 people and no less or more than
 With students running the server and client side on two separate computers.
 9. Project must be submitted to canvas as a .rar or .zip file containing all the source codes.
 
-## How to Play
-- Run the `GameServer.py` via Windows or Unix (WSL not Supported)
-- Run the `Client.py` via Windows or Unix (Client has help menu)
+</details>
 
-Once the Server detects the player has connected, the Play button will appear on the tkinter gui and you can play at your own leisure.<br>
-Objective is to Not Drop the Soap! Catch as many falling bars of soap as you can! The game progressively gets more difficult.
+## To Build
+If you want to run either client or server on Windows you must install [Python.exe](https://www.python.org/)
+If you do not have Python installed on Unix run `sudo apt update && sudo apt install python3`
+```bash
+git clone https://github.com/EndermanSUPREME/SoapCatcher.git
+```
+
+## To Run
+To start up the Game Server:<br>
+`python GameServer.py`
+
+To Connect to the Game Server as a Client:<br>
+`python Client.py [GameServer IP] [GameSever Port]`
+
+## How to Play
+Once the Server detects the player has connected, the Play button will appear on the tkinter gui and you can play at your own leisure. The player uses the `WASD` keys to move around the gane canvas. The game objective is to `not drop the soap`. Bars of soap will periodically fall from the top of the game screen, catch as many bars of soap as you can. The game progressively gets more difficult by increasing the speed the soap falls at, as well as increasing the player speed.
 
 ### Preview Image
 ![Game_Preview_Image](https://github.com/user-attachments/assets/f86dc443-b307-40c5-99b0-90e99b3cb5bc)
