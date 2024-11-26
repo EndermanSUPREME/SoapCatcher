@@ -1,5 +1,5 @@
 # Soap Catcher
-# Description
+## Description
 This assignment is focused on getting involved with Socket Servers to understand how the Transport Layer sends over the data and forms a connection. Along with seeing how the Application Layer handles sending and recieving the data. The setup involves a game being hosted on a Server where the player(s) are controlled through the connection of a Client.
 
 ## Project Assignment
