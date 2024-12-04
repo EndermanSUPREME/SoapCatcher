@@ -6,10 +6,15 @@ hostname = ""
 IPAddr = ""
 PORT = 8888
 RUNNING = True
+RUNGAME = False
 PLAYERCONNECTED = False
 KILLPROGRAM = False
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 root = tk.Tk()
+
+# only pack once so we dont overlap packing causing display issues
+usernameList = tk.Label(root, text="")
+usernameList.pack(pady=10)
 
 class Player:
     def __init__(self,connection,address,x,y):
@@ -18,8 +23,14 @@ class Player:
         self.x = x
         self.y = y
         self.size = 0
+        self.username = ""
         self.icon = pygame.image.load("hands_.png")
         self.recvBuffer = b''
+
+    def SetUsername(self,name:str):
+        self.username = name
+    def GetUsername(self):
+        return self.username
 
     def GetPosX(self):
         return self.x
@@ -91,6 +102,19 @@ def ViewConnection():
     else:
         root.after(100, ViewConnection)
 
+def DisplayPlayers():
+    global root,ConnectedPlayers,usernameList
+
+    # Display connected users to the handler tkinter window
+    usernames = ""
+    for players in ConnectedPlayers:
+        usernames = usernames + f"{players.GetUsername()}\n"
+
+    names=f"Connected Players:\n{usernames}"
+    usernameList.config(text=names)
+
+    root.after(100, DisplayPlayers)
+
 def GameStatus():
     global root,RUNNING,rbutton,flabel
 
@@ -119,6 +143,7 @@ def ServerHandle():
     root.geometry("200x200")
 
     ViewConnection()
+    DisplayPlayers()
     GameStatus()
 
     root.mainloop()
@@ -128,6 +153,13 @@ def ConnectClient(connection, address, PlayerData):
     try:
         if RUNNING:
             print(f"[+] Incoming Connection from {address}\n")
+
+            # Get player name from connected client
+            msg = "Enter Username > "
+            connection.sendall(msg.encode())
+            playerUsername = connection.recv(12).decode()
+            PlayerData.SetUsername(playerUsername)
+
             PLAYERCONNECTED = True
             # Handle Single Connection
             while KILLPROGRAM == False:
@@ -140,6 +172,10 @@ def ConnectClient(connection, address, PlayerData):
                 if len(recvBuffer) > 0:
                     if recvBuffer.decode() == "\n":
                         print(f"{address} has Disconnected")
+                        # remove player session on disconnection
+                        for player in ConnectedPlayers:
+                            if player.GetAddress() == address:
+                                ConnectedPlayers.remove(player)
                         break
                     if recvBuffer.decode() != "str":
                         print(f"Recv -> {address} | {recvBuffer.decode()}")
@@ -150,7 +186,7 @@ def RunServer():
     try:
         global hostname,IPAddr,PORT
         global serversocket,RUNNING,PLAYERCONNECTED
-        global KILLPROGRAM,ConnectedPlayers
+        global KILLPROGRAM,RUNGAME,ConnectedPlayers
 
         PlayerThreads = []
 
@@ -162,18 +198,23 @@ def RunServer():
         print(f"Your Computer IP Address is: {IPAddr}")
 
         serversocket.bind((str(IPAddr), PORT))
-        serversocket.listen(4) # become a server socket, maximum 4 connections
+        serversocket.listen(10) # queue connections
         print(f"[+] Server Active | {IPAddr}:{PORT}\n")
 
         print("[*] Listening for Players. . .")
         while RUNNING:
             connection, address = serversocket.accept()
 
-            PlayerSession = Player(connection,address,0,0)
-            playerThread = threading.Thread(target=ConnectClient,args=[connection,address,PlayerSession])
-            ConnectedPlayers.append(PlayerSession)
-            PlayerThreads.append(playerThread)
-            playerThread.start()
+            # Dont allow connections while the game is running
+            if RUNGAME:
+                connection.sendall(b"Connection Denied: Game is in Progress.")
+                connection.close()
+            else:
+                PlayerSession = Player(connection,address,0,0)
+                playerThread = threading.Thread(target=ConnectClient,args=[connection,address,PlayerSession])
+                ConnectedPlayers.append(PlayerSession)
+                PlayerThreads.append(playerThread)
+                playerThread.start()
 
         # Close connection to all players
         for p in ConnectedPlayers:
@@ -187,169 +228,205 @@ def RunServer():
         print(f"Error: {e}")
 
 def BucketGame():
-    global RUNNING,root,ConnectedPlayers
+    try:
+        global RUNNING,RUNGAME,root,ConnectedPlayers
 
-    # Initialize Pygame
-    pygame.init()
+        # Initialize Pygame
+        pygame.init()
 
-    # Set up the display
-    window_width, window_height = 800, 600
-    screen = pygame.display.set_mode((window_width, window_height))
-    font = pygame.font.Font(None, 36)
-    pygame.display.set_caption("Ender's Bucket Game")
+        RUNGAME = True
 
-    # Define colors
-    BLACK = (0, 0, 0)
-    WHITE = (255, 255, 255)
-    RED = (255, 0, 0)
-    GREEN = (0, 255, 0)
-    BLUE = (0, 0, 255)
-    UN = (100, 50, 100)
+        # Set up the display
+        window_width, window_height = 800, 600
+        screen = pygame.display.set_mode((window_width, window_height))
+        font = pygame.font.Font(None, 36)
+        playerTagFont = pygame.font.Font(None, 24)
+        pygame.display.set_caption("Ender's Bucket Game")
 
-    # Setup All Players
-    # Player properties
-    square_size = 50
-    x = window_width // 2 - square_size // 2
-    y = window_height // 2 - square_size // 2
-    speed = 2
-    playerImg = pygame.image.load("hands_.png")
-    playerImg = pygame.transform.scale(playerImg, (square_size, square_size))
+        # Define colors
+        BLACK = (0, 0, 0)
+        WHITE = (255, 255, 255)
+        RED = (255, 0, 0)
+        GREEN = (0, 255, 0)
+        BLUE = (0, 0, 255)
+        UN = (100, 50, 100)
 
-    for p in ConnectedPlayers:
-        p.SetPosX(x + random.randrange(square_size // 2, window_width - (square_size // 2)))
-        p.SetPosY(y)
-        p.SetSize(square_size)
-        p.SetPlayerIcon(playerImg)
+        # Setup All Players
+        # Player properties
+        square_size = 50
+        x = window_width // 2 - square_size // 2
+        y = window_height // 2 - square_size // 2
+        speed = 2
+        playerImg = pygame.image.load("hands_.png")
+        playerImg = pygame.transform.scale(playerImg, (square_size, square_size))
 
-    # Falling Particle properties
-    fallingParticleSize = 50
-    fallSpeed = 1
-    particle_image = pygame.image.load("soap_.png")
-    particle_image = pygame.transform.scale(particle_image, (fallingParticleSize, fallingParticleSize))
-    FallingParticles = []
-
-    # Extra
-    Duration = 5 # Set the duration to wait (in seconds)
-    DiffcultyTimer = 30 # Set the duration to wait (in seconds)
-    Chance = 80 # Set the duration to wait (in seconds)
-    sTime = time.time() # Record the start time
-    gTime = time.time() # Record the global start time
-    Points = 0
-
-    # Main game loop
-    while RUNNING:
-        # Handle events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                RUNNING = False  # Exit the loop if the window is closed
-
-        # Everything we want happening during gameplay
-        # occurs below this point
-
-        cTime = time.time()
-        if cTime - gTime >= DiffcultyTimer:
-            fallSpeed = fallSpeed + 1
-            speed = speed + 1
-            if Duration > 2:
-                Duration = Duration - 1
-            if Chance > 15:
-                Chance = Chance - 5
-            gTime = cTime
-
-        # Fill the screen with a color (RGB)
-        screen.fill(BLACK)  # Clear to draw next Frame
-
-#=======================================================
-#       RANDOM PARTICLE SPAWN
-        cTime = time.time()
-        if random.randint(0, 100) > Chance and cTime - sTime >= Duration:
-            FallingParticles.append(FallingParticle(random.randint(0, window_width - fallingParticleSize), 5))
-            sTime = cTime
-
-        # Points Display
-        ScoreText = font.render(f"Score: {Points}", True, WHITE)
-        screen.blit(ScoreText, (10, 10))
-
-        for p in FallingParticles:
-            if p.GetPosY() >= window_height:
-                RUNNING = False
-                pygame.quit()
-
-            fallPos = p.GetPosY() + fallSpeed
-            p.SetPosY(fallPos)
-
-            for PlayerSession in ConnectedPlayers:
-                player = pygame.Rect(PlayerSession.GetPosX(), PlayerSession.GetPosY(), PlayerSession.GetSize(), PlayerSession.GetSize())
-                particleSubject = pygame.Rect(p.GetPosX(), p.GetPosY(), fallingParticleSize, fallingParticleSize)
-
-                # Catch falling object
-                if player.colliderect(particleSubject):
-                    FallingParticles.remove(p)
-                    Points = Points + 1
-                    ScoreText = font.render(f"Score: {Points}", True, WHITE)
-                    screen.blit(ScoreText, (10, 10))
-                else:
-                    # pygame.draw.rect(screen, RED, particleSubject)
-                    screen.blit(particle_image, (p.GetPosX(), p.GetPosY()))
-
-#=======================================================
-
-#=======================================================
-#       PLAYER MOVEMENT
-
-        # Track all Player Movement
         for p in ConnectedPlayers:
-            y = p.GetPosY()
-            x = p.GetPosX()
-
-            if p.GetRecvBuffer().decode() == "Up":
-                y -= speed
-            if p.GetRecvBuffer().decode() == "Down":
-                y += speed
-            if p.GetRecvBuffer().decode() == "Left":
-                x -= speed
-            if p.GetRecvBuffer().decode() == "Right":
-                x += speed
-
-            # Keep the square within the window boundaries
-            x = max(0, min(window_width - square_size, x))
-            y = max(window_height/2, min(window_height - square_size, y))
-
-            p.SetPosX(x)
+            p.SetPosX(x + random.randrange(square_size // 2, window_width - (square_size // 2)))
             p.SetPosY(y)
+            p.SetSize(square_size)
+            p.SetPlayerIcon(playerImg)
 
-            # Draw the player
-            # pygame.draw.rect(screen, WHITE, (x, y, square_size, square_size))
-            screen.blit(p.GetPlayerIcon(), (x, y))
-#=======================================================
+        # Falling Particle properties
+        fallingParticleSize = 50
+        fallSpeed = 1
+        particle_image = pygame.image.load("soap_.png")
+        particle_image = pygame.transform.scale(particle_image, (fallingParticleSize, fallingParticleSize))
+        FallingParticles = []
 
-        # Update the display
-        pygame.display.flip()
+        # Extra
+        Duration = 5 # Set the duration to wait (in seconds)
+        DiffcultyTimer = 30 # Set the duration to wait (in seconds)
+        Chance = 80 # Set the duration to wait (in seconds)
+        sTime = time.time() # Record the start time
+        gTime = time.time() # Record the global start time
+        Points = 0
 
-        # Control the frame rate
-        pygame.time.Clock().tick(60)
+        # Main game loop
+        while RUNNING:
+            # Handle events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    RUNNING = False  # Exit the loop if the window is closed
+                    RUNGAME = False  # Allow new players to join the next game session
 
-    # Clean up and close the window
-    pygame.quit()
+            # End game when no players exist
+            if len(ConnectedPlayers) == 0:
+                RUNNING = False  # Exit the loop if the window is closed
+                RUNGAME = False  # Allow new players to join the next game session
+
+            # Everything we want happening during gameplay
+            # occurs below this point
+
+            cTime = time.time()
+            if cTime - gTime >= DiffcultyTimer:
+                fallSpeed = fallSpeed + 1
+                speed = speed + 1
+                if Duration > 2:
+                    Duration = Duration - 1
+                if Chance > 15:
+                    Chance = Chance - 5
+                gTime = cTime
+
+            # Fill the screen with a color (RGB)
+            screen.fill(BLACK)  # Clear to draw next Frame
+
+    #=======================================================
+    #       RANDOM PARTICLE SPAWN
+            cTime = time.time()
+            if random.randint(0, 100) > Chance and cTime - sTime >= Duration:
+                # spawn in the number of particles as there are players
+                for i in range(0,len(ConnectedPlayers)):
+                    FallingParticles.append(FallingParticle(random.randint(0, window_width - fallingParticleSize), 5))
+
+                sTime = cTime
+
+            # Points Display
+            ScoreText = font.render(f"Score: {Points}", True, WHITE)
+            screen.blit(ScoreText, (10, 10))
+
+            for p in FallingParticles:
+                if p.GetPosY() >= window_height:
+                    RUNNING = False
+                    RUNGAME = False
+                    pygame.quit()
+
+                fallPos = p.GetPosY() + fallSpeed
+                p.SetPosY(fallPos)
+
+                for PlayerSession in ConnectedPlayers:
+                    player = pygame.Rect(PlayerSession.GetPosX(), PlayerSession.GetPosY(), PlayerSession.GetSize(), PlayerSession.GetSize())
+                    particleSubject = pygame.Rect(p.GetPosX(), p.GetPosY(), fallingParticleSize, fallingParticleSize)
+
+                    # Catch falling object
+                    if player.colliderect(particleSubject):
+                        FallingParticles.remove(p)
+                        Points = Points + 1
+                        ScoreText = font.render(f"Score: {Points}", True, WHITE)
+                        screen.blit(ScoreText, (10, 10))
+                    else:
+                        # pygame.draw.rect(screen, RED, particleSubject)
+                        screen.blit(particle_image, (p.GetPosX(), p.GetPosY()))
+
+    #=======================================================
+
+    #=======================================================
+    #       PLAYER MOVEMENT
+
+            # Track all Player Movement
+            for p in ConnectedPlayers:
+                y = p.GetPosY()
+                x = p.GetPosX()
+
+                if p.GetRecvBuffer().decode() == "Up":
+                    y -= speed
+                if p.GetRecvBuffer().decode() == "Down":
+                    y += speed
+                if p.GetRecvBuffer().decode() == "Left":
+                    x -= speed
+                if p.GetRecvBuffer().decode() == "Right":
+                    x += speed
+
+                # Keep the square within the window boundaries
+                x = max(0, min(window_width - square_size, x))
+                y = max(window_height/2, min(window_height - square_size, y))
+
+                p.SetPosX(x)
+                p.SetPosY(y)
+
+                # Draw the player
+                # pygame.draw.rect(screen, WHITE, (x, y, square_size, square_size))
+                screen.blit(p.GetPlayerIcon(), (x, y))
+
+                # Render player name
+                playerName = playerTagFont.render(p.GetUsername(), True, WHITE)
+                screen.blit(playerName, (x - playerName.get_size()[0], y + square_size))
+    #=======================================================
+
+            # Update the display
+            pygame.display.flip()
+
+            # Control the frame rate
+            pygame.time.Clock().tick(60)
+
+        # Clean up and close the window
+        RUNGAME = False
+        pygame.quit()
+    except:
+        return None
 
 def ServerShutDown():
     messagebox.showinfo("Message", "Initiating Server Shutdown")
-    global RUNNING,serversocket,root,KILLPROGRAM
+    global RUNNING,KILLPROGRAM,serversocket,root,ConnectedPlayers
+
     RUNNING = False
     KILLPROGRAM = True
 
-    # Initiate Shutdown
-    serversocket.close()
+    # disconnect all sessions
+    for players in ConnectedPlayers:
+        try:
+            players.GetConnection.close()
+        finally:
+            continue
+
+    try:
+        # Initiate Shutdown
+        serversocket.close()
+    finally:
+        None
 
     # Use a fake socket to exit from the server.accept() loop
     try:
         fakeSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         fakeSocket.connect((IPAddr, PORT))
-    except Exception as e:
-        return None
+    finally:
+        None
 
-    # Kill GUI
-    root.destroy()
+    try:
+        # Kill GUI
+        root.destroy()
+    finally:
+        None
+
     print("[*] Server Shutting Down. . .")
 
 def ReadyGame():

@@ -55,6 +55,12 @@ def StartClient():
 
     try:
         clientsocket.connect((serverIP, serverPORT))
+
+        # enter username on initial connection
+        prompt = clientsocket.recv(64).decode()
+        username = str(input(prompt))
+        clientsocket.sendall(username.encode())
+
         print("Hold down the arrow keys. Press ESC to stop...")
         while True:
             global msgData
